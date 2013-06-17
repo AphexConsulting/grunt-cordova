@@ -15,6 +15,7 @@ var versionRegex = /^([^#])#(.*)$/;
 var sys = require('sys');
 var child_process = require('child_process');
 var path = require('path');
+var fse = require('fs-extra');
 
 function expect(cmd, options, next) {
   if (!next && typeof options === 'function') {
@@ -87,35 +88,71 @@ module.exports = function(grunt) {
 
     var versionMatch = platform.match(versionRegex);
     var repoUrl;
-    var dir;
+    var cordovaDir;
     
     if (versionMatch) {
       repoUrl = 'git://github.com/apache/cordova-' + versionMatch[1] + '.git#' + versionMatch[2];
-      dir = path.resolve(options.path, 'git', 'cordova-' + versionMatch[1] + '.git');
+      cordovaDir = path.resolve(options.path, 'git', 'cordova-' + versionMatch[1] + '.git');
     } else {
       repoUrl = 'git://github.com/apache/cordova-' + platform + '.git';
-      dir = path.resolve(options.path, 'git', 'cordova-' + platform + '.git');
+      cordovaDir = path.resolve(options.path, 'git', 'cordova-' + platform + '.git');
     }
     var buildDir = path.resolve(options.path, 'builds', platform);
+    var assetsDir = path.join(buildDir, 'assets/www');
+
+    function pullStep() {
+      if (!grunt.file.isDir(cordovaDir)) {
+        grunt.file.mkdir(cordovaDir);
+        pullRepo(repoUrl, cordovaDir, options, createStep);
+      } else {
+        console.log('Repo already exists, so no need to pull anything');
+        createStep();
+      }
+    }
 
     function createStep() {
       grunt.file.mkdir(path.dirname(buildDir));
       
-      if (!grunt.file.isDir(dir)) {
+      console.log('running create?');
+      if (!grunt.file.isDir(buildDir)) {
         // (conditionally) run create
-        console.log('running create?');
-        expect(dir + '/bin/create ' + buildDir + ' ' + options.package + ' ' + options.name, function(err) {
+        expect(cordovaDir + '/bin/create ' + buildDir + ' ' + options.package + ' ' + options.name, function(err) {
           if (err) {
             console.log('err: ' + err);
             next(err);
           } else {
             console.log('Done creating!');
-            buildStep();
+            cleanupStep();
           }
         });
       } else {
-        buildStep();
+        // Just presume cleanup has been done previously and just
+        // overwrite.
+        collectStep();
       }
+    }
+    
+    function cleanupStep() {
+      fse.remove(assetsDir, function(err) {
+        if (err) {
+          console.log('Error', err);
+          next(err);
+        } else {
+          collectStep();
+        }
+      });
+    }
+    
+    function collectStep() {
+      console.log('collect', directory);
+      fse.copy(directory, assetsDir, function(err) {
+        if (err) {
+          console.log('Error', err);
+          next(err);
+        } else {
+          buildStep();
+        }
+      });
     }
     
     function buildStep() {
@@ -136,13 +173,7 @@ module.exports = function(grunt) {
       });
     }
 
-    if (!grunt.file.isDir(dir)) {
-      grunt.file.mkdir(dir);
-      pullRepo(repoUrl, dir, options, createStep);
-    } else {
-      console.log('Repo already exists, so no need to pull anything');
-      createStep();
-    }
+    pullStep();
   }
 
   grunt.registerMultiTask('cordova', 'Wrap an application package with Cordova.', function(target, platform) {
