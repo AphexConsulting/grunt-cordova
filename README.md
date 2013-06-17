@@ -19,6 +19,9 @@ Once the plugin has been installed, it may be enabled inside your Gruntfile with
 grunt.loadNpmTasks('grunt-cordova');
 ```
 
+You also need to have the android command line utilities on your path. Try 'adb' on the command-line to see if it works. If it doesn't,
+search the internet for now.
+
 ## The "cordova" task
 
 ### Overview
