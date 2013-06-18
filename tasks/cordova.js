@@ -8,6 +8,10 @@
 
 // TODO:
 // - check for android being in the path (when building for android), or at least show errors correctly
+// - support build.phonegap.com -style config.xml (https://build.phonegap.com/docs/config-xml)
+//  - use the phonegap-version information when checking out cordova (if possible)
+// - detect possible target platforms (check if 'android --help' works, check to see if Xcode binaries work, check if we are on Windows, etc.)
+// 
 
 'use strict';
 
@@ -17,33 +21,38 @@ var child_process = require('child_process');
 var path = require('path');
 var fse = require('fs-extra');
 
-function expect(cmd, options, next) {
+function expect(cmd, match, options, next) {
+  if (!next && typeof match === 'function') {
+    next = match;
+    match = {};
+  }
   if (!next && typeof options === 'function') {
     next = options;
     options = {};
   }
   console.log('=== ' + cmd);
   var args = cmd.split(' ');
-  var p = child_process.spawn(args[0], args.slice(1, args.length));
+  var p = child_process.spawn(args[0], args.slice(1, args.length), options);
   p.stdout.on('data', function(line) {
-      var m, error;
-      for(var re in options) {
-        m = line.toString().match(re);
-        if (m) {
-          error = options[re].apply(null, m);
-          if (error) {
-            return next(error);
-          }
+    var m, error;
+    for(var re in match) {
+      m = line.toString().match(re);
+      if (m) {
+        error = match[re].apply(null, m);
+        if (error) {
+          return next(error);
         }
       }
+    }
   });
+  var error = '';
   p.stderr.on('data', function(line) {
-    next(line);
+    error = error + line.toString();
   });
   p.on('close', function(code) {
     console.log('code: ' + code);
     if (code) {
-      next(code);
+      next({error:error, code:code});
     } else {
       next();
     }
@@ -55,29 +64,6 @@ module.exports = function(grunt) {
   // Please see the Grunt documentation for more information regarding task
   // creation: http://gruntjs.com/creating-tasks
 
-  function pullRepo(repoUrl, dir, options, next) {
-    console.log('Url: ' + repoUrl);
-    console.log('  - to: ' + dir);
-    console.log('Cloning...');
-    
-    expect('git clone ' + repoUrl + ' ' + dir, {
-      '^fatal: (.*)': function(line, error) {
-        return error;
-      },
-      '^Cloning into': function(line) {
-        next();
-      }
-    }, function(err) {
-      if (err) {
-        console.log('err: ' + err);
-        next(err);
-      } else {
-        console.log('Done!');
-        next();
-      }
-    });
-  }
-
   function build(directory, platform, options, next) {
     if (!grunt.file.isDir(directory)) {
       grunt.log.warn('Source file "' + directory + '" is not a directory.');
@@ -86,34 +72,71 @@ module.exports = function(grunt) {
     
     console.log('Building: ' + platform);
 
-    var versionMatch = platform.match(versionRegex);
     var repoUrl;
+    var cordovaVersion;
     var cordovaDir;
     
+    var versionMatch = platform.match(versionRegex);
     if (versionMatch) {
-      repoUrl = 'git://github.com/apache/cordova-' + versionMatch[1] + '.git#' + versionMatch[2];
-      cordovaDir = path.resolve(options.path, 'git', 'cordova-' + versionMatch[1] + '.git');
+      platform = versionMatch[1];
+      cordovaVersion = versionMatch[2];
+      
     } else {
-      repoUrl = 'git://github.com/apache/cordova-' + platform + '.git';
-      cordovaDir = path.resolve(options.path, 'git', 'cordova-' + platform + '.git');
+      cordovaVersion = 'master';
     }
+    repoUrl = 'git://github.com/apache/cordova-' + platform + '.git';
+    cordovaDir = path.resolve(options.path, 'git', 'cordova-' + platform + '.git');
+    
     var buildDir = path.resolve(options.path, 'builds', platform);
     var assetsDir = path.join(buildDir, 'assets/www');
 
-    function pullStep() {
+    function cloneOrPullStep() {
       if (!grunt.file.isDir(cordovaDir)) {
         grunt.file.mkdir(cordovaDir);
-        pullRepo(repoUrl, cordovaDir, options, createStep);
+        console.log('Clone url: ' + repoUrl);
+        console.log('  - to: ' + cordovaDir);
+        console.log('Cloning...');
+
+        expect('git clone ' + repoUrl + ' ' + cordovaDir, {}, function(err) {
+          if (err) {
+            console.log('Error:', err);
+            next(err);
+          } else {
+            checkoutStep();
+          }
+        });
       } else {
-        console.log('Repo already exists, so no need to pull anything');
-        createStep();
+        console.log('Pulling...');
+        expect('git pull', {}, {cwd: cordovaDir}, function(err) {
+          if (err) {
+            console.log('Error:', err);
+            next(err);
+          } else {
+            checkoutStep();
+          }
+        });
       }
+    }
+    
+    var alreadyRe = /^Already on '/;
+    function checkoutStep() {
+      console.log('Checkout step:', cordovaVersion);
+
+      expect('git checkout ' + cordovaVersion, {}, {cwd: cordovaDir}, function(err) {
+        
+        if (err && !err.match(alreadyRe)) {
+          console.log('Error:', err);
+          next(err);
+        } else {
+          createStep();
+        }
+      });
     }
 
     function createStep() {
       grunt.file.mkdir(path.dirname(buildDir));
       
-      console.log('running create?');
+      console.log('running create');
       if (!grunt.file.isDir(buildDir)) {
         // (conditionally) run create
         expect(cordovaDir + '/bin/create ' + buildDir + ' ' + options.package + ' ' + options.name, function(err) {
@@ -173,7 +196,7 @@ module.exports = function(grunt) {
       });
     }
 
-    pullStep();
+    cloneOrPullStep();
   }
 
   grunt.registerMultiTask('cordova', 'Wrap an application package with Cordova.', function(target, platform) {

@@ -19,6 +19,10 @@ Once the plugin has been installed, it may be enabled inside your Gruntfile with
 grunt.loadNpmTasks('grunt-cordova');
 ```
 
+This plugin works on OSX, it might work on Linux and it just might work on Windows as well.
+
+You need to have git on your path.
+
 You also need to have the android command line utilities on your path. Try 'adb' on the command-line to see if it works. If it doesn't,
 search the internet for now.
 
