@@ -21,6 +21,8 @@ var child_process = require('child_process');
 var path = require('path');
 var fse = require('fs-extra');
 
+var platforms = ['android', 'ios', 'wp8', 'windows/windows8', 'blackberry/blackberry', 'blackberry/blackberry10'];
+
 function expect(cmd, match, options, next) {
   if (!next && typeof match === 'function') {
     next = match;
@@ -75,6 +77,8 @@ module.exports = function(grunt) {
     var repoUrl;
     var cordovaVersion;
     var cordovaDir;
+    var cordovaRepoDir;
+    var subdir = '';
     
     var versionMatch = platform.match(versionRegex);
     if (versionMatch) {
@@ -84,20 +88,26 @@ module.exports = function(grunt) {
     } else {
       cordovaVersion = 'master';
     }
+    var platformPath = platform.split('/');
+    if (platformPath.length > 1) {
+      platform = platformPath.shift();
+      subdir = platformPath.join('/');
+    }
     repoUrl = 'git://github.com/apache/cordova-' + platform + '.git';
-    cordovaDir = path.resolve(options.path, 'git', 'cordova-' + platform + '.git');
+    cordovaRepoDir = path.resolve(options.path, 'git', 'cordova-' + platform + '.git');
+    cordovaDir = path.resolve(cordovaRepoDir, subdir);
     
     var buildDir = path.resolve(options.path, 'builds', platform);
     var assetsDir = path.join(buildDir, 'assets/www');
 
     function cloneOrPullStep() {
       if (!grunt.file.isDir(cordovaDir)) {
-        grunt.file.mkdir(cordovaDir);
+        grunt.file.mkdir(cordovaRepoDir);
         console.log('Clone url: ' + repoUrl);
         console.log('  - to: ' + cordovaDir);
         console.log('Cloning...');
 
-        expect('git clone ' + repoUrl + ' ' + cordovaDir, {}, function(err) {
+        expect('git clone ' + repoUrl + ' ' + cordovaRepoDir, {}, function(err) {
           if (err) {
             console.log('Error:', err);
             next(err);
@@ -107,7 +117,7 @@ module.exports = function(grunt) {
         });
       } else {
         console.log('Pulling...');
-        expect('git pull', {}, {cwd: cordovaDir}, function(err) {
+        expect('git pull', {}, {cwd: cordovaRepoDir}, function(err) {
           if (err) {
             console.log('Error:', err);
             next(err);
@@ -122,7 +132,7 @@ module.exports = function(grunt) {
     function checkoutStep() {
       console.log('Checkout step:', cordovaVersion);
 
-      expect('git checkout ' + cordovaVersion, {}, {cwd: cordovaDir}, function(err) {
+      expect('git checkout ' + cordovaVersion, {}, {cwd: cordovaRepoDir}, function(err) {
         
         if (err && !err.match(alreadyRe)) {
           console.log('Error:', err);
@@ -199,7 +209,7 @@ module.exports = function(grunt) {
     cloneOrPullStep();
   }
 
-  grunt.registerMultiTask('cordova', 'Wrap an application package with Cordova.', function(target, platform) {
+  grunt.registerMultiTask('cordova', 'Wrap an application package with Cordova.', function() {
     // Merge task-specific and/or target-specific options with these defaults.
     var options = this.options({
       path: '.cordova',
@@ -207,12 +217,18 @@ module.exports = function(grunt) {
       name: 'Example',
       mode: 'debug',
       // platforms: ['android', 'ios', 'wp8']
-      platforms: ['android']
+      platforms: 'android'
     });
     
     // Allow usage like this: grunt cordova:main:android
-    if (platform) {
-      options.platforms = [platform];
+    if (arguments.length) {
+      var platform = arguments[arguments.length - 1];
+      if (platform === 'detect' || platforms.indexOf(platform) !== -1) {
+        options.platforms = platform;
+      }
+    }
+    if (typeof options.platforms === 'string') {
+      options.platforms = [options.platforms];
     }
 
     var done = this.async();
