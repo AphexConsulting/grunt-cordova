@@ -40,6 +40,9 @@ function expect(cmd, match, options, next) {
     cmd = cmd.split(' ');
   }
   console.log('CMD: ' + cmd.join(' '));
+  console.log('match', match);
+  console.log('options', options);
+  console.log('next', next);
   
   var p = child_process.spawn(cmd[0], cmd.slice(1, cmd.length), options);
   p.stdout.on('data', function(line) {
@@ -49,17 +52,20 @@ function expect(cmd, match, options, next) {
       if (m) {
         error = match[re].apply(null, m);
         if (error) {
+          console.log('error', error);
           return next(error);
         }
       }
     }
   });
+  
   var error = '';
   p.stderr.on('data', function(line) {
     error = error + line.toString();
   });
   p.on('close', function(code) {
     console.log('code: ' + code);
+    console.log('error: ' + error);
     if (code) {
       next({error:error, code:code});
     } else {
@@ -230,14 +236,12 @@ module.exports = function(grunt) {
           next();
         }
       }
-      renderTemplates(path.resolve('templates', platform), path.resolve(buildDir), next);
-      
-      buildStep();
+      renderTemplates(path.resolve('templates', platform), path.resolve(buildDir), buildStep);
     }
     
     function buildStep() {
       console.log('build step');
-      expect(buildDir + '/cordova/build --' + options.mode, {
+      expect([buildDir + '/cordova/build', '--' + options.mode], {
         '.*': function(line) {
           console.log('BUILD: ' + line);
         }
@@ -312,7 +316,11 @@ module.exports = function(grunt) {
       });
       
       var count = 0;
-      function next() {
+      function next(err) {
+        if (err) {
+          console.log('Cordova build error!', JSON.stringify(err));          
+        }
+        
         count--;
         if (!count) {
           grunt.log.writeln('Done wrapping with Cordova.');
