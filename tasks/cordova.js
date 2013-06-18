@@ -179,11 +179,14 @@ module.exports = function(grunt) {
     }
     
     function cleanupStep() {
+      var cordovaJs = fs.readFileSync(path.resolve(assetsDir, 'cordova.js'));
       fse.remove(assetsDir, function(err) { // TODO: except cordova.js
         if (err) {
           console.log('Error', err);
           next(err);
         } else {
+          grunt.file.mkdir(assetsDir);
+          fs.writeFileSync(path.resolve(assetsDir, 'cordova.js'), cordovaJs);
           collectStep();
         }
       });
@@ -206,7 +209,8 @@ module.exports = function(grunt) {
       console.log(grunt.file.findup('templates/**/*', {matchBase:false}));
       var data = {
         config:config,
-        preferences:{}
+        preferences:{},
+        grunt:grunt
       };
       if (config.widget.preference) {
         for(var i = 0; i < config.widget.preference.length; i++) {

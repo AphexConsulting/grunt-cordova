@@ -57,7 +57,7 @@
         android:screenOrientation="<%=preferences.orientation==='default'?'sensor':preferences.orientation%>"
         <% } %>
         android:debuggable="true">
-        <activity android:name="Example" android:label="@string/app_name"
+        <activity android:name="<%=grunt.util._.classify(config.widget.name)%>" android:label="@string/app_name"
                 android:theme="@android:style/Theme.Black.NoTitleBar"
                 android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale">
             <intent-filter>
