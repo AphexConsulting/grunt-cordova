@@ -7,11 +7,12 @@
  */
 
 // TODO:
+// - support config.xml
 // - check for android being in the path (when building for android), or at least show errors correctly
 // - support build.phonegap.com -style config.xml (https://build.phonegap.com/docs/config-xml)
 //  - use the phonegap-version information when checking out cordova (if possible)
 // - detect possible target platforms (check if 'android --help' works, check to see if Xcode binaries work, check if we are on Windows, etc.)
-// 
+// - user-specific settings in ~/.grunt-cordova/settings, like keystore passwords etc.
 
 'use strict';
 
@@ -19,7 +20,10 @@ var versionRegex = /^([^#])#(.*)$/;
 var sys = require('sys');
 var child_process = require('child_process');
 var path = require('path');
+var fs = require('fs');
 var fse = require('fs-extra');
+var xml2js = require('xml2js');
+var _s = require('underscore.string');
 
 var platforms = ['android', 'ios', 'wp8', 'windows/windows8', 'blackberry/blackberry', 'blackberry/blackberry10'];
 
@@ -32,9 +36,12 @@ function expect(cmd, match, options, next) {
     next = options;
     options = {};
   }
-  console.log('=== ' + cmd);
-  var args = cmd.split(' ');
-  var p = child_process.spawn(args[0], args.slice(1, args.length), options);
+  if (typeof cmd === 'string') {
+    cmd = cmd.split(' ');
+  }
+  console.log('CMD: ' + cmd.join(' '));
+  
+  var p = child_process.spawn(cmd[0], cmd.slice(1, cmd.length), options);
   p.stdout.on('data', function(line) {
     var m, error;
     for(var re in match) {
@@ -74,6 +81,7 @@ module.exports = function(grunt) {
     
     console.log('Building: ' + platform);
 
+    var config;
     var repoUrl;
     var cordovaVersion;
     var cordovaDir;
@@ -149,9 +157,9 @@ module.exports = function(grunt) {
       console.log('running create');
       if (!grunt.file.isDir(buildDir)) {
         // (conditionally) run create
-        expect(cordovaDir + '/bin/create ' + buildDir + ' ' + options.package + ' ' + options.name, function(err) {
+        expect([cordovaDir + '/bin/create', buildDir, config.widget.$.id, grunt.util._.classify(config.widget.name)], function(err) {
           if (err) {
-            console.log('err: ' + err);
+            console.log('err: ' + JSON.stringify(err));
             next(err);
           } else {
             console.log('Done creating!');
@@ -159,14 +167,13 @@ module.exports = function(grunt) {
           }
         });
       } else {
-        // Just presume cleanup has been done previously and just
-        // overwrite.
+        // Just presume cleanup has been done previously and just overwrite the assets.
         collectStep();
       }
     }
     
     function cleanupStep() {
-      fse.remove(assetsDir, function(err) {
+      fse.remove(assetsDir, function(err) { // TODO: except cordova.js
         if (err) {
           console.log('Error', err);
           next(err);
@@ -183,14 +190,53 @@ module.exports = function(grunt) {
           console.log('Error', err);
           next(err);
         } else {
-          buildStep();
+          renderTemplatesStep();
         }
       });
     }
     
+    function renderTemplatesStep() {
+      console.log('render templates step');
+      console.log(grunt.file.findup('templates/**/*', {matchBase:false}));
+      var data = {
+        config:config,
+        preferences:{}
+      };
+      if (config.widget.preference) {
+        for(var i = 0; i < config.widget.preference.length; i++) {
+          console.log(i, config.widget.preference[i]);
+          data.preferences[config.widget.preference[i].$.name] = config.widget.preference[i].$.value;
+        }        
+      }
+      console.log('preferences', data.preferences);
+      
+      function renderTemplates(sourcePath, targetPath, next) {
+        var dir = fs.readdirSync(sourcePath);
+        for(var i = 0; i < dir.length; i++) {
+          var source = path.resolve(sourcePath, dir[i]);
+          var target = path.resolve(targetPath, dir[i]);
+          
+          if (grunt.file.isDir(source)) {
+            renderTemplates(path.join(sourcePath, dir[i]), path.join(targetPath, dir[i]));
+          } else {
+            console.log('Template', source, '=>', target);
+            var template = fs.readFileSync(source).toString();
+            var result = grunt.template.process(template, {data:data});
+            console.log(result);
+            fs.writeFileSync(target, result);
+          }
+        }
+        if (next) {
+          next();
+        }
+      }
+      renderTemplates(path.resolve('templates', platform), path.resolve(buildDir), next);
+      
+      buildStep();
+    }
+    
     function buildStep() {
-      // TODO: run build
-      console.log('building?');
+      console.log('build step');
       expect(buildDir + '/cordova/build --' + options.mode, {
         '.*': function(line) {
           console.log('BUILD: ' + line);
@@ -206,7 +252,23 @@ module.exports = function(grunt) {
       });
     }
 
-    cloneOrPullStep();
+    // TODO: function generateDefaultConfig(): load package.json and run templates/config.xml with it
+    
+    function loadConfig() {
+      var parser = new xml2js.Parser();
+      fs.readFile(path.resolve(directory, 'config.xml'), function(err, data) {
+        if (err) {
+          console.log('Error loading config.xml. Make sure it is in the root of the data folder.');
+          return;
+        }
+        parser.parseString(data, function (err, result) {
+          config = result;
+          console.dir(config);
+          cloneOrPullStep();
+        });
+      });
+    }
+    loadConfig();
   }
 
   grunt.registerMultiTask('cordova', 'Wrap an application package with Cordova.', function() {

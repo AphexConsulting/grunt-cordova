@@ -37,7 +37,10 @@
     "grunt": "~0.4.1"
   },
   "dependencies": {
-    "fs-extra": "0.6.x"
+    "fs-extra": "0.6.x",
+    "underscore": "~1.4.4",
+    "xml2js": "~0.2.8",
+    "underscore.string": "~2.3.1"
   },
   "keywords": [
     "gruntplugin"
