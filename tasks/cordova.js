@@ -236,7 +236,7 @@ module.exports = function(grunt) {
           next();
         }
       }
-      renderTemplates(path.resolve('templates', platform), path.resolve(buildDir), buildStep);
+      renderTemplates(path.resolve(__dirname, '../templates', platform), path.resolve(buildDir), buildStep);
     }
     
     function buildStep() {
