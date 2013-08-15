@@ -43,6 +43,7 @@
     "underscore.string": "~2.3.1"
   },
   "keywords": [
-    "gruntplugin"
+    "gruntplugin",
+    "cordova"
   ]
 }
