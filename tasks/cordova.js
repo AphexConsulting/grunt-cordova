@@ -233,14 +233,15 @@ module.exports = function(grunt) {
     
     function renderTemplatesStep() {
       console.log('render templates step');
+      var metafile = path.resolve(__dirname, '../templates', platform, 'meta.json');
+      var meta = grunt.file.exists(metafile)?grunt.file.readJSON(metafile):{};
       var data = {
         config:config,
         preferences:{},
         grunt:grunt,
         res:res,
-        meta:grunt.file.readJSON(path.resolve(__dirname, '../templates', platform, 'meta.json'))
+        meta:meta
       };
-      console.log('Meta: ', data.meta);
 
       if (config.widget.preference) {
         for(var i = 0; i < config.widget.preference.length; i++) {
