@@ -36,7 +36,7 @@ module.exports = function(grunt) {
         files: {
           'tmp/default_options': ['test/fixtures/base'],
         },
-      },
+      }
     },
 
     // Unit tests.

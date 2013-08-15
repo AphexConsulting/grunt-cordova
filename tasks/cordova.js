@@ -25,7 +25,27 @@ var fse = require('fs-extra');
 var xml2js = require('xml2js');
 var _s = require('underscore.string');
 
-var platforms = ['android', 'ios', 'wp8', 'windows/windows8', 'blackberry/blackberry', 'blackberry/blackberry10'];
+// android, ios, winphone, blackberry, webos,
+// ios, android, blackberry10, wp7, wp8 (plugman supported)
+// var oldPlatformList = ['android', 'ios', 'wp8', 'windows/windows8', 'blackberry/blackberry', 'blackberry/blackberry10'];
+
+var platforms = {
+  android: {
+    contentDir: 'assets/www',
+    repoUrl: 'git://github.com/apache/cordova-android.git',
+    repoPath: ''
+  },
+  ios: {
+    contentDir: 'www',
+    repoUrl: 'git://github.com/apache/cordova-ios.git',
+    repoPath: ''
+  },
+  wp8: {
+    contentDir: 'www',
+    repoUrl: 'git://github.com/apache/cordova-wp8.git',
+    repoPath: ''
+  }
+};
 
 function expect(cmd, match, options, next) {
   if (!next && typeof match === 'function') {
@@ -80,12 +100,19 @@ module.exports = function(grunt) {
   // creation: http://gruntjs.com/creating-tasks
 
   function build(directory, platform, options, next) {
+
     if (!grunt.file.isDir(directory)) {
       grunt.log.warn('Source file "' + directory + '" is not a directory.');
       return false;
     }
+    if (typeof platforms[platform] === 'undefined') {
+      grunt.log.warn('Unknown platform: ' + platform);
+      return false;
+    }
     
-    console.log('Building: ' + platform);
+    var res = {};
+
+    console.log('Building for ' + platform);
 
     var config;
     var repoUrl;
@@ -107,12 +134,12 @@ module.exports = function(grunt) {
       platform = platformPath.shift();
       subdir = platformPath.join('/');
     }
-    repoUrl = 'git://github.com/apache/cordova-' + platform + '.git';
-    cordovaRepoDir = path.resolve(options.path, 'git', 'cordova-' + platform + '.git');
-    cordovaDir = path.resolve(cordovaRepoDir, subdir);
+    repoUrl = platforms[platform].repoUrl;
+    cordovaRepoDir = path.resolve(options.path, 'git', platform);
+    cordovaDir = path.resolve(cordovaRepoDir, platforms[platform].repoPath);
     
     var buildDir = path.resolve(options.path, 'builds', platform);
-    var assetsDir = path.join(buildDir, 'assets/www');
+    var assetsDir = path.join(buildDir, platforms[platform].contentDir);
 
     function cloneOrPullStep() {
       if (!grunt.file.isDir(cordovaDir)) {
@@ -210,7 +237,8 @@ module.exports = function(grunt) {
       var data = {
         config:config,
         preferences:{},
-        grunt:grunt
+        grunt:grunt,
+        res:res
       };
       if (config.widget.preference) {
         for(var i = 0; i < config.widget.preference.length; i++) {
@@ -287,19 +315,25 @@ module.exports = function(grunt) {
       name: 'Example',
       mode: 'debug',
       // platforms: ['android', 'ios', 'wp8']
-      platforms: 'android'
+      platforms: ['android', 'ios'],
+      icons: 'icons',
+      content: 'content'
     });
     
     // Allow usage like this: grunt cordova:main:android
-    if (arguments.length) {
-      var platform = arguments[arguments.length - 1];
-      if (platform === 'detect' || platforms.indexOf(platform) !== -1) {
+    if (this.args.length) {
+      var platform = this.args[this.args.length - 1];
+      console.log('Last argument ' + platform);
+      if (platform === 'detect' || platform in platforms) {
+        console.log('Found ' + platform + ' in arguments!');
         options.platforms = platform;
       }
     }
     if (typeof options.platforms === 'string') {
       options.platforms = [options.platforms];
     }
+
+    console.log('Platforms: ' + options.platforms);
 
     var done = this.async();
     
@@ -331,7 +365,10 @@ module.exports = function(grunt) {
           done();
         }
       }
-      
+      console.log('DONE!');
+      done();
+      return;
+
       for(var i = 0; i < src.length; i++) {
         for(var j = 0; j < options.platforms.length; j++) {
           count++;

@@ -2,3 +2,5 @@ node_modules
 npm-debug.log
 tmp
 .cordova
+
+.DS_Store
