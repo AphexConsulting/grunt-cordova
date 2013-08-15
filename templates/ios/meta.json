@@ -1,0 +1,5 @@
+{
+	"templates": {
+		"Project/config.xml": "<%=grunt.util._.classify(config.widget.name)%>"
+	}
+}

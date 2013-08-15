@@ -233,13 +233,15 @@ module.exports = function(grunt) {
     
     function renderTemplatesStep() {
       console.log('render templates step');
-      console.log(grunt.file.findup('templates/**/*', {matchBase:false}));
       var data = {
         config:config,
         preferences:{},
         grunt:grunt,
-        res:res
+        res:res,
+        meta:grunt.file.readJSON(path.resolve(__dirname, '../templates', platform, 'meta.json'))
       };
+      console.log('Meta: ', data.meta);
+
       if (config.widget.preference) {
         for(var i = 0; i < config.widget.preference.length; i++) {
           console.log(i, config.widget.preference[i]);
@@ -365,9 +367,6 @@ module.exports = function(grunt) {
           done();
         }
       }
-      console.log('DONE!');
-      done();
-      return;
 
       for(var i = 0; i < src.length; i++) {
         for(var j = 0; j < options.platforms.length; j++) {
