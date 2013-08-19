@@ -60,9 +60,9 @@ function expect(cmd, match, options, next) {
     cmd = cmd.split(' ');
   }
   console.log('CMD: ' + cmd.join(' '));
-  console.log('match', match);
-  console.log('options', options);
-  console.log('next', next);
+  // console.log('match', match);
+  // console.log('options', options);
+  // console.log('next', next);
   
   var p = child_process.spawn(cmd[0], cmd.slice(1, cmd.length), options);
   p.stdout.on('data', function(line) {
@@ -251,19 +251,34 @@ module.exports = function(grunt) {
       }
       console.log('preferences', data.preferences);
       
-      function renderTemplates(sourcePath, targetPath, next) {
+      var buildPath = path.resolve(buildDir);
+      var templatePath = path.resolve(__dirname, '../templates', platform);
+
+      function renderTemplates(relativePath, sourcePath, targetPath, next) {
         var dir = fs.readdirSync(sourcePath);
         for(var i = 0; i < dir.length; i++) {
           var source = path.resolve(sourcePath, dir[i]);
           var target = path.resolve(targetPath, dir[i]);
+          var relative = path.join(relativePath, dir[i]);
           
+          console.log('relativePath: ' + relative);
+
+          if (meta[relative]) {
+            if (meta[relative].filename) {
+              target = path.resolve(buildPath, grunt.template.process(meta[relative].filename, {data:data}));
+            }
+          }
+
+          console.log('source: ' + source);
           if (grunt.file.isDir(source)) {
-            renderTemplates(path.join(sourcePath, dir[i]), path.join(targetPath, dir[i]));
+            renderTemplates(path.join(relativePath, dir[i]), path.join(sourcePath, dir[i]), path.join(targetPath, dir[i]));
+          } else if (dir[i] === 'meta.json') {
+            console.log('Ignoring: ' + dir[i]);
           } else {
             console.log('Template', source, '=>', target);
             var template = fs.readFileSync(source).toString();
             var result = grunt.template.process(template, {data:data});
-            console.log(result);
+            // console.log(result);
             fs.writeFileSync(target, result);
           }
         }
@@ -271,7 +286,7 @@ module.exports = function(grunt) {
           next();
         }
       }
-      renderTemplates(path.resolve(__dirname, '../templates', platform), path.resolve(buildDir), buildStep);
+      renderTemplates('', templatePath, buildPath, buildStep);
     }
     
     function buildStep() {

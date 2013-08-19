@@ -1,5 +1,8 @@
 {
-	"templates": {
-		"Project/config.xml": "<%=grunt.util._.classify(config.widget.name)%>"
+	"Project/config.xml": {
+		"filename": "<%=grunt.util._.classify(config.widget.name)%>/config.xml"
+	},
+	"Project/Project-Info.plist": {
+		"filename": "<%=grunt.util._.classify(config.widget.name)%>/Project-Info.plist"
 	}
 }
