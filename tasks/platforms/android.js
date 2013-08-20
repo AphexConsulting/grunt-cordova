@@ -10,6 +10,8 @@ var path = require('path');
 var fs = require('fs');
 var im = require('node-imagemagick');
 var mkdirp = require('mkdirp');
+var _s = require('underscore.string');
+var fse = require('fs-extra');
 
 module.exports = function(directory, buildDir, options) {
   var platform = {
@@ -83,6 +85,29 @@ module.exports = function(directory, buildDir, options) {
       console.log('waiting for resources');
       done = next; // sign up for async call when everything is done
     }
+  }
+
+  platform.cleanup = function(next) {
+    // Android specific. TODO: move to platforms/android.js
+    var res = fs.readdirSync(path.resolve(buildDir, 'res'));
+    console.log('res:' + res);
+
+    var cleaning = 0;
+    for(var i = 0; i < res.length; i++) {
+      if (_s.startsWith(res[i], 'drawable')) {
+        cleaning++;
+        fse.remove(path.resolve(buildDir, 'res', res[i]), function(err) {
+          if (err) {
+            console.log('Error', err);
+            next(err);
+          } else {
+            cleaning--;
+            if (cleaning === 0) next();
+          }
+        });
+      }
+    }
+    if (!cleaning) next();
   }
 
   return platform;

@@ -293,28 +293,8 @@ module.exports = function(grunt) {
           collectStep();          
         }
 
-        // Android specific. TODO: move to platforms/android.js
-        var res = fs.readdirSync(path.resolve(buildDir, 'res'));
-        console.log('res:' + res);
-
-        var cleaning = 0;
-        for(var i = 0; i < res.length; i++) {
-          if (_s.startsWith(res[i], 'drawable')) {
-            cleaning++;
-            fse.remove(path.resolve(buildDir, 'res', res[i]), function(err) {
-              if (err) {
-                console.log('Error', err);
-                next(err);
-              } else {
-                cleaning--;
-                if (cleaning === 0) done();
-              }
-            });
-          }
-        }
-        if (!cleaning) {
-          done();
-        }
+        if (platform.cleanup) platform.cleanup(done);
+        else done();
       });
     }
     

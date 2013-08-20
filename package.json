@@ -1,7 +1,7 @@
 {
   "name": "grunt-cordova",
   "description": "Wrap an application package with Cordova.",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "homepage": "https://github.com/AphexConsulting/grunt-cordova",
   "author": {
     "name": "Rolf Sormo",
