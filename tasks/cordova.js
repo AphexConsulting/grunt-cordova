@@ -16,7 +16,6 @@
 
 'use strict';
 
-var versionRegex = /^([^#])#(.*)$/;
 var sys = require('sys');
 var child_process = require('child_process');
 var path = require('path');
@@ -106,11 +105,13 @@ module.exports = function(grunt) {
     
     var res = {};
 
-    console.log('Building for ' + platformName);
+    var versionMatch = platformName.split('#');
+    platformName = versionMatch[0];
+    var cordovaVersion = versionMatch[1] || 'master';
+    console.log('Building for ' + platformName + ' (' + cordovaVersion + ')');
 
     var config;
     var repoUrl;
-    var cordovaVersion;
     var cordovaDir;
     var cordovaRepoDir;
     
@@ -135,13 +136,6 @@ module.exports = function(grunt) {
     var assetsDir;
 
     function initVariables() {
-      var versionMatch = platformName.match(versionRegex);
-      if (versionMatch) {
-        platformName = versionMatch[1];
-        cordovaVersion = versionMatch[2];
-      } else {
-        cordovaVersion = 'master';
-      }
       buildDir = path.resolve(options.path, 'builds', platformName);
       // platform = platforms[platformName];
       platform = require('./platforms/' + platformName)(directory, buildDir, options, grunt, config);
@@ -431,7 +425,7 @@ module.exports = function(grunt) {
       name: 'Example',
       mode: 'debug',
       // platforms: ['android', 'ios', 'wp8']
-      platforms: ['android', 'ios'],
+      platforms: ['android#2.9.0', 'ios'],
       icons: 'icons',
       content: 'content',
       graphics: './graphics'
