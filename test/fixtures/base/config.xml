@@ -15,4 +15,5 @@
 
     <preference name="orientation" value="portrait"/>
     <preference name="keepScreenOn" value="true"/>
+    <preference name="fullscreen" value="true"/>
 </widget>
