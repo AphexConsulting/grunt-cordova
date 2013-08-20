@@ -237,7 +237,7 @@ module.exports = function(grunt) {
         });
       } else {
         console.log('Pulling...');
-        expect('git pull', {}, {cwd: cordovaRepoDir}, function(err) {
+        expect('git pull origin ' + cordovaVersion, {}, {cwd: cordovaRepoDir}, function(err) {
           if (err) {
             console.log('Error:', err);
             next(err);
