@@ -192,7 +192,7 @@ module.exports = function(grunt) {
           fallback = graphics[0];
           for(var i = 0; i < graphics.length; i++) {
             var g = graphics[i];
-            if (_s.startsWith(g.filename, name)) {
+            if (_s.startsWith(g.filename, filename)) {
               // Better fallback is to pick any graphics with at least similar name.
               fallback = g;
               if (filename && g.filename === filename) {
@@ -213,7 +213,7 @@ module.exports = function(grunt) {
         }
         if (info) {
           info.name = name;
-          return platform.saveGraphics(name, filename, width, height, info);
+          return platform.saveGraphics(name, filename, width, height, info, res);
         }
         return null;
       }

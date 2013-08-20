@@ -21,13 +21,39 @@ module.exports = function(directory, buildDir, options) {
 
   var converting = 0;
   var done;
+  var sizes = {
+    'ldpi':0.5,
+     'mdpi':1,
+     'hdpi':1.5,
+     'xhdpi':2,
+     'xxhdpi':3,
+     'nodpi':0};
 
-  platform.saveGraphics = function(name, filename, width, height, info) {
+  platform.saveGraphics = function(name, filename, width, height, info, res) {
     converting++;
 
+    var generic = true;
+    for(var k in sizes) {
+      if (name.indexOf(k) !== -1) {
+        generic = false;
+        break;
+      }
+    }
+    console.log('filename: ' + filename);
+    info.name = filename.split('.')[0];
+
+    // Generate all other sizes as well.
+    if (generic) {
+      console.log('GENERATING ALL SIZES!');
+      for(var size in sizes) {
+        if (size === 'mdpi' || size === 'nodpi') continue;
+
+        res.getGraphics(name + '-' + size, info.name + '.' + filename.split('.')[1], width * sizes[size], height * sizes[size]);
+      }
+    }
+
     var subdir = 'res/drawable';
-    var sizes = ['ldpi', 'mdpi', 'hdpi', 'xhdpi', 'nodpi', 'tvdpi'];
-    for(var i = 0; i < sizes.length; i++) if (info.filename.indexOf(sizes[i]) !== -1) subdir = 'res/drawable-' + sizes[i];
+    for(var size in sizes) if (name.indexOf(size) !== -1 || info.name.indexOf(size) !== -1) subdir = 'res/drawable-' + size;
     var dir = path.resolve(buildDir, subdir);
     mkdirp.sync(dir);
 
