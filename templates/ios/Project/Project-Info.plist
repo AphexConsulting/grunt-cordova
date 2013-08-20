@@ -28,10 +28,10 @@
 		<dict>
 			<key>CFBundleIconFiles</key>
 			<array>
-                <string>icon.png</string>
-                <string>icon@2x.png</string>
-                <string>icon-72.png</string>
-                <string>icon-72@2x.png</string>
+                <string><%=res.getGraphics('icon', 'icon.png', 57, 57).filename%></string>
+                <string><%=res.getGraphics('icon', 'icon@2x.png', 114, 114).filename%></string>
+                <string><%=res.getGraphics('icon', 'icon-72.png', 72, 72).filename%></string>
+                <string><%=res.getGraphics('icon', 'icon-72@2x.png', 144, 144).filename%></string>
 			</array>
 			<key>UIPrerenderedIcon</key>
 			<false/>

@@ -1,7 +1,7 @@
 {
   "name": "grunt-cordova",
   "description": "Wrap an application package with Cordova.",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "homepage": "https://github.com/AphexConsulting/grunt-cordova",
   "author": {
     "name": "Rolf Sormo",
@@ -40,7 +40,10 @@
     "fs-extra": "0.6.x",
     "underscore": "~1.4.4",
     "xml2js": "~0.2.8",
-    "underscore.string": "~2.3.1"
+    "underscore.string": "~2.3.1",
+    "png-js": "~0.1.1",
+    "node-imagemagick": "~0.1.8",
+    "mkdirp": "~0.3.5"
   },
   "keywords": [
     "gruntplugin",

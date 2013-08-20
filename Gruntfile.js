@@ -32,6 +32,7 @@ module.exports = function(grunt) {
     cordova: {
       default_options: {
         options: {
+          graphics: 'test/graphics'
         },
         files: {
           'tmp/default_options': ['test/fixtures/base'],

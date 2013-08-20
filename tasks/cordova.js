@@ -23,29 +23,27 @@ var path = require('path');
 var fs = require('fs');
 var fse = require('fs-extra');
 var xml2js = require('xml2js');
+var _ = require('underscore');
 var _s = require('underscore.string');
+var PNG = require('png-js');
 
 // android, ios, winphone, blackberry, webos,
 // ios, android, blackberry10, wp7, wp8 (plugman supported)
 // var oldPlatformList = ['android', 'ios', 'wp8', 'windows/windows8', 'blackberry/blackberry', 'blackberry/blackberry10'];
 
-var platforms = {
-  android: {
-    contentDir: 'assets/www',
-    repoUrl: 'git://github.com/apache/cordova-android.git',
-    repoPath: ''
-  },
-  ios: {
-    contentDir: 'www',
-    repoUrl: 'git://github.com/apache/cordova-ios.git',
-    repoPath: ''
-  },
-  wp8: {
-    contentDir: 'www',
-    repoUrl: 'git://github.com/apache/cordova-wp8.git',
-    repoPath: ''
-  }
-};
+// var platforms = {
+//   android: require('./platforms/android')(directory),
+//   ios: {
+//     contentDir: 'www',
+//     repoUrl: 'git://github.com/apache/cordova-ios.git',
+//     repoPath: ''
+//   },
+//   wp8: {
+//     contentDir: 'www',
+//     repoUrl: 'git://github.com/apache/cordova-wp8.git',
+//     repoPath: ''
+//   }
+// };
 
 function expect(cmd, match, options, next) {
   if (!next && typeof match === 'function') {
@@ -99,48 +97,135 @@ module.exports = function(grunt) {
   // Please see the Grunt documentation for more information regarding task
   // creation: http://gruntjs.com/creating-tasks
 
-  function build(directory, platform, options, next) {
+  function build(directory, platformName, options, next) {
 
     if (!grunt.file.isDir(directory)) {
       grunt.log.warn('Source file "' + directory + '" is not a directory.');
       return false;
     }
-    if (typeof platforms[platform] === 'undefined') {
-      grunt.log.warn('Unknown platform: ' + platform);
-      return false;
-    }
     
     var res = {};
 
-    console.log('Building for ' + platform);
+    console.log('Building for ' + platformName);
 
     var config;
     var repoUrl;
     var cordovaVersion;
     var cordovaDir;
     var cordovaRepoDir;
-    var subdir = '';
     
-    var versionMatch = platform.match(versionRegex);
-    if (versionMatch) {
-      platform = versionMatch[1];
-      cordovaVersion = versionMatch[2];
-      
-    } else {
-      cordovaVersion = 'master';
-    }
-    var platformPath = platform.split('/');
-    if (platformPath.length > 1) {
-      platform = platformPath.shift();
-      subdir = platformPath.join('/');
-    }
-    repoUrl = platforms[platform].repoUrl;
-    cordovaRepoDir = path.resolve(options.path, 'git', platform);
-    cordovaDir = path.resolve(cordovaRepoDir, platforms[platform].repoPath);
+    // TODO: function generateDefaultConfig(): load package.json and run templates/config.xml with it
     
-    var buildDir = path.resolve(options.path, 'builds', platform);
-    var assetsDir = path.join(buildDir, platforms[platform].contentDir);
+    function loadConfig() {
+      var parser = new xml2js.Parser();
+      fs.readFile(path.resolve(directory, 'config.xml'), function(err, data) {
+        if (err) {
+          console.log('Error loading config.xml. Make sure it is in the root of the data folder.');
+          return;
+        }
+        parser.parseString(data, function (err, result) {
+          config = result;
+          console.dir(config);
+          initVariables();
+        });
+      });
+    }
+    var buildDir;
+    var platform;
+    var assetsDir;
 
+    function initVariables() {
+      var versionMatch = platformName.match(versionRegex);
+      if (versionMatch) {
+        platformName = versionMatch[1];
+        cordovaVersion = versionMatch[2];
+      } else {
+        cordovaVersion = 'master';
+      }
+      buildDir = path.resolve(options.path, 'builds', platformName);
+      // platform = platforms[platformName];
+      platform = require('./platforms/' + platformName)(directory, buildDir, options, grunt, config);
+      assetsDir = path.join(buildDir, platform.contentDir);
+
+      var files = [];
+      
+      function readdir(directory) {
+        console.log('--------- ' + directory);
+        try {
+          files = files.concat(_.map(fs.readdirSync(directory), function(file) { return path.resolve(directory, file); }));
+        } catch(e) { }
+      }
+      readdir(path.resolve(options.graphics, platform.name));
+      readdir(path.resolve(options.graphics, 'common'));
+
+      console.log('Found graphics: ', files);
+
+      var graphics = [];
+      for(var i = 0; i < files.length; i++) {
+        var png = PNG.load(files[i]);
+        png.filename = path.basename(files[i]);
+        png.path = files[i];
+        graphics.push(png);
+        console.log(files[i] + ':', png);
+      }
+      function findExact(name, filename, width, height) {
+        return _.find(graphics, function(g) {
+          console.log('G:' + g);
+          return _s.startsWith(g.filename, name) &&
+            (!filename || g.filename === filename) &&
+            (!width || g.width === width) &&
+            (!height || g.height === height);
+        });
+      }
+      res.hasExactGraphics = function(name, filename, width, height) {
+        console.log('hasExactGraphics: ' + Array.prototype.toString.apply(arguments));
+        return findExact.apply(this, arguments);
+      }
+      res.getGraphics = function(name, filename, width, height) {
+        if (!filename) filename = name + '.png';
+
+        var info = findExact.apply(this, arguments);
+
+        if (!info) {
+          var secondary, fallback;
+          // Fallback is to pick any graphics.
+          fallback = graphics[0];
+          for(var i = 0; i < graphics.length; i++) {
+            var g = graphics[i];
+            if (_s.startsWith(g.filename, name)) {
+              // Better fallback is to pick any graphics with at least similar name.
+              fallback = g;
+              if (filename && g.filename === filename) {
+                info = g;
+                break;
+              }
+              // Primary method is to pick the smallest graphics that is larger or equal to what was requested.
+              if ((!width || g.width >= width) && (!height || g.height >= height)) {
+                if (!info || ((g.width < info.width) && (g.height < info.height))) info = g;
+              }
+              // Secondary method is to pick the largest graphics that is smaller than what was requested.
+              if ((!width || g.width < width) && (!height || g.height < height)) {
+                if (!secondary || ((g.width > secondary.width) && (g.height > secondary.height))) secondary = g;
+              }
+            }
+          }
+          info = info || secondary || fallback;
+        }
+        if (info) {
+          info.name = name;
+          return platform.saveGraphics(name, filename, width, height, info);
+        }
+        return null;
+      }
+
+      repoUrl = platform.repoUrl;
+      cordovaRepoDir = path.resolve(options.path, 'git', platformName);
+      cordovaDir = path.resolve(cordovaRepoDir, platform.repoPath);
+
+      cloneOrPullStep();
+    }
+
+    
     function cloneOrPullStep() {
       if (!grunt.file.isDir(cordovaDir)) {
         grunt.file.mkdir(cordovaRepoDir);
@@ -206,8 +291,8 @@ module.exports = function(grunt) {
     }
     
     function cleanupStep() {
-      var cordovaJs = fs.readFileSync(path.resolve(assetsDir, 'cordova.js'));
-      fse.remove(assetsDir, function(err) { // TODO: except cordova.js
+      var cordovaJs = fs.readFileSync(path.resolve(assetsDir, 'cordova.js')); // save cordova.js
+      fse.remove(assetsDir, function(err) {
         if (err) {
           console.log('Error', err);
           next(err);
@@ -233,14 +318,15 @@ module.exports = function(grunt) {
     
     function renderTemplatesStep() {
       console.log('render templates step');
-      var metafile = path.resolve(__dirname, '../templates', platform, 'meta.json');
+      var metafile = path.resolve(__dirname, '../templates', platformName, 'meta.json');
       var meta = grunt.file.exists(metafile)?grunt.file.readJSON(metafile):{};
       var data = {
         config:config,
         preferences:{},
         grunt:grunt,
         res:res,
-        meta:meta
+        meta:meta,
+        platform:platform
       };
 
       if (config.widget.preference) {
@@ -252,7 +338,7 @@ module.exports = function(grunt) {
       console.log('preferences', data.preferences);
       
       var buildPath = path.resolve(buildDir);
-      var templatePath = path.resolve(__dirname, '../templates', platform);
+      var templatePath = path.resolve(__dirname, '../templates', platformName);
 
       function renderTemplates(relativePath, sourcePath, targetPath, next) {
         var dir = fs.readdirSync(sourcePath);
@@ -286,7 +372,15 @@ module.exports = function(grunt) {
           next();
         }
       }
-      renderTemplates('', templatePath, buildPath, buildStep);
+      renderTemplates('', templatePath, buildPath, waitResourcesStep);
+    }
+
+    function waitResourcesStep() {
+      if (platform.waitResources) {
+        platform.waitResources(buildStep);
+      } else {
+        buildStep();
+      }
     }
     
     function buildStep() {
@@ -306,22 +400,6 @@ module.exports = function(grunt) {
       });
     }
 
-    // TODO: function generateDefaultConfig(): load package.json and run templates/config.xml with it
-    
-    function loadConfig() {
-      var parser = new xml2js.Parser();
-      fs.readFile(path.resolve(directory, 'config.xml'), function(err, data) {
-        if (err) {
-          console.log('Error loading config.xml. Make sure it is in the root of the data folder.');
-          return;
-        }
-        parser.parseString(data, function (err, result) {
-          config = result;
-          console.dir(config);
-          cloneOrPullStep();
-        });
-      });
-    }
     loadConfig();
   }
 
@@ -335,14 +413,16 @@ module.exports = function(grunt) {
       // platforms: ['android', 'ios', 'wp8']
       platforms: ['android', 'ios'],
       icons: 'icons',
-      content: 'content'
+      content: 'content',
+      graphics: './graphics'
     });
     
     // Allow usage like this: grunt cordova:main:android
     if (this.args.length) {
       var platform = this.args[this.args.length - 1];
       console.log('Last argument ' + platform);
-      if (platform === 'detect' || platform in platforms) {
+      // if (platform === 'detect' || platform in platforms)
+      {
         console.log('Found ' + platform + ' in arguments!');
         options.platforms = platform;
       }
@@ -383,6 +463,13 @@ module.exports = function(grunt) {
           done();
         }
       }
+
+      // for(var j = 0; j < options.platforms.length; j++) {
+      //   if (!options.platforms[i] in platforms) {
+      //     grunt.log.warn('Unknown platform: ' + options.platforms[i]);
+      //     return false;
+      //   }
+      // }
 
       for(var i = 0; i < src.length; i++) {
         for(var j = 0; j < options.platforms.length; j++) {
