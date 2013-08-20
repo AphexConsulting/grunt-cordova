@@ -1,0 +1,5 @@
+{
+	"src/MainActivity.java": {
+		"filename": "src/<%=config.widget.$.id.replace(/\\./g,'/')%>/<%=grunt.util._.classify(config.widget.name)%>.java"
+	}
+}

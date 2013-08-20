@@ -4,5 +4,8 @@
 	},
 	"Project/Project-Info.plist": {
 		"filename": "<%=grunt.util._.classify(config.widget.name)%>/Project-Info.plist"
+	},
+	"Project/Classes/MainViewController.m": {
+		"filename": "<%=grunt.util._.classify(config.widget.name)%>/Classes/MainViewController.m"
 	}
 }
